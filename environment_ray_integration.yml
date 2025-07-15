@@ -1,0 +1,27 @@
+name: ray-integration
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+  - rapidsai
+dependencies:
+  - ipywidgets
+  - umap-learn
+  - opencv
+  - scikit-learn
+  - cuml
+  - sunpy
+  - pandas
+  - hdbscan
+  - wandb
+  - matplotlib
+  - seaborn
+  - reproject
+  - pip
+  - einops
+  - pip:
+    - torch 
+    - torchvision
+    - torchaudio
+    - pytorch-lightning
+    - -e /home/nlaurent/dfreproject
