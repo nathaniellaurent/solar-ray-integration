@@ -257,6 +257,71 @@ def integrate_field_volumetric(
 
     return output_tensor
 
+def integrate_field_volumetric_trapezoidal(
+    field: Callable[[torch.Tensor, Any], torch.Tensor],
+    source_hdu: Any,
+    dx: float = 1e7,
+    requires_grad: bool = False,
+    device: str = "cuda:0"
+) -> torch.Tensor:
+    """
+    Integrate a scalar field along rays, including pixel area correction.
+
+    Args:
+        field: Function that evaluates the scalar field at given coordinates.
+        source_hdu: FITS HDU containing image data and header.
+        dx: Step size along the ray in meters.
+        requires_grad: If True, enables autograd for PyTorch tensors.
+        device: Device for computation ('cuda:0' for GPU, 'cpu' for CPU).
+
+    Returns:
+        Integrated field image (2D tensor) with pixel area correction.
+    """
+
+    integration = RayIntegrator(
+        field=field,
+        source_hdu=source_hdu,
+        dx=dx,
+        requires_grad=requires_grad,
+        device=device
+    )
+
+    output_tensor = integration.generate_ray_tensor()
+
+    # Pad zeros to the front of the third dimension (s) of output_tensor
+    output_tensor_1 = torch.cat(
+        [torch.zeros_like(output_tensor[:, :, :1]), output_tensor], dim=2
+    )
+
+    output_tensor_2 = torch.cat(
+        [output_tensor, torch.zeros_like(output_tensor[:, :, :1])], dim=2
+    )
+
+    output_tensor = (output_tensor_1 + output_tensor_2) / 2
+
+    del output_tensor_1, output_tensor_2
+
+    output_tensor = output_tensor[:, :, 1:-1]
+
+    area = integration.generate_area_tensor()
+    area = area[:, :, :-1]
+
+    # Check memory usage of output_tensor
+    tensor_bytes = output_tensor.element_size() * output_tensor.nelement()
+    tensor_megabytes = tensor_bytes / (1024 ** 2)
+    print(f"output_tensor uses {tensor_megabytes:.2f} MB of memory")
+
+    output_tensor = output_tensor * area
+    
+    
+    del area
+
+
+    output_tensor = reduce(output_tensor, 'h w s -> h w', 'sum')
+    torch.cuda.empty_cache()
+
+    return output_tensor
+
 def integrate_field_volumetric_correction(
     field: Callable[[torch.Tensor, Any], torch.Tensor],
     source_hdu: Any,

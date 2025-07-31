@@ -11,11 +11,9 @@ from dask import delayed, compute
 from dask.diagnostics import ProgressBar
 
 import os
-import sys
 
-sys.path.append("src")  
 
-from ray_integration.integrate_field import integrate_field_linear, integrate_field_volumetric, integrate_field_volumetric_correction
+from solar_ray_integration.ray_integration.integrate_field import integrate_field_linear, integrate_field_volumetric, integrate_field_volumetric_correction, integrate_field_volumetric_trapezoidal
 
 
 
@@ -115,11 +113,11 @@ if __name__ == "__main__":
     # print(client.dashboard_link)
 
 
-    output_dir = "perspective_data/perspective_data_linear_fits_test"
+    output_dir = "perspective_data/perspective_data_volumetric_fits_radial_trapezoidal"
     os.makedirs(output_dir, exist_ok=True)
 
-    hgln_values = np.linspace(-180, 180, 1)
-    hglt_values = np.linspace(-90, 90, 1)
+    hgln_values = np.linspace(-180, 180, 2)
+    hglt_values = np.linspace(-90, 90, 2)
 
 
 
@@ -140,12 +138,12 @@ if __name__ == "__main__":
         source_wcs.wcs.aux.hgln_obs = float(hgln)
         temp_hdu = PrimaryHDU(source_data, header=source_wcs.to_header())
 
-        output_tensor = integrate_field_volumetric_correction(
-            sun_sphere_scalar,
+        output_tensor = integrate_field_volumetric_trapezoidal(
+            sun_sphere_scalar_radial,
             temp_hdu,
             dx=1e7,
             requires_grad=False,
-            device='cuda:0'
+            device='cpu'
         )
         
         output_hdu = PrimaryHDU(output_tensor.cpu().detach().numpy(), header=source_wcs.to_header())
@@ -169,7 +167,7 @@ if __name__ == "__main__":
             idx += 1
 
     with ProgressBar():
-        results = compute(*tasks, scheduler='processes', num_workers=2)
+        results = compute(*tasks, scheduler='threads', num_workers=1)
 
 
     for idx, (output_hdu, fits_filename) in enumerate(results):
