@@ -83,13 +83,13 @@ def train_model(
         seed=seed
     )
     
-    # NeRF configuration
+    # Smaller NeRF configuration for reduced memory usage
     nerf_config = {
         'd_input': 3,
         'd_output': 1,
-        'n_layers': 8,
-        'd_filter': 512,
-        'encoding': 'positional'
+        'n_layers': 4,  # Reduced from 8 to 4
+        'd_filter': 256,  # Reduced from 512 to 256
+        'encoding': None #'positional'
     }
     
     # Initialize model
@@ -161,7 +161,9 @@ def train_model(
     print(f"  Integration method: {integration_method}")
     print(f"  GPUs: {gpus}")
     print(f"  Workers: {num_workers}")
-    print(f"  Using {gpus} GPU(s)")
+    print(f"  Precision: {precision}")
+    print(f"  Model layers: {nerf_config['n_layers']}")
+    print(f"  Model width: {nerf_config['d_filter']}")
     
     # Train model
     trainer.fit(

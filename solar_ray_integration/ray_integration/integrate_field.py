@@ -79,11 +79,17 @@ class RayIntegrator:
 
         
 
+        
+
         obs, rays = calculate_rays(
             source_wcs=source_wcs,
             shape_out=self.shape,
             requires_grad=self.requires_grad,
         )
+
+       
+
+
 
         rays = rays.to(dtype=torch.float32, device=self.device)
         obs = obs.to(dtype=torch.float32, device=self.device)
@@ -94,7 +100,32 @@ class RayIntegrator:
         rays_no_batch = rearrange(rays, "1 h w c -> h w c 1")  # shape (H, W, 3)
 
         steps = self.steps
+
+        # Estimate memory usage of rays_with_steps
+        rays_no_batch_shape = rays_no_batch.shape  # (H, W, 3, 1)
+        steps_shape = steps.shape  # (1, 1, 1, S)
+
+        # Resulting shape of rays_with_steps
+        rays_with_steps_shape = (
+            rays_no_batch_shape[0],  # H
+            rays_no_batch_shape[1],  # W
+            steps_shape[3],          # S
+            rays_no_batch_shape[2],  # C (3)
+        )
+
+        # Calculate memory usage
+        element_size = rays_no_batch.element_size()  # Size of each element in bytes
+        num_elements = torch.prod(torch.tensor(rays_with_steps_shape))  # Total number of elements
+        memory_bytes = num_elements.item() * element_size  # Total memory in bytes
+        memory_megabytes = memory_bytes / (1024 ** 2)  # Convert to MB
+
+        print(f"rays_with_steps will use approximately {memory_megabytes:.2f} MB of memory.")
+
         rays_with_steps = rays_no_batch * steps
+
+        # Debugging: Check the shape and memory usage of rays_with_steps
+        print(f"Shape of rays_with_steps: {rays_with_steps.shape}")
+        print(f"Memory usage of rays_with_steps: {memory_megabytes:.2f} MB")
 
         del rays_no_batch, steps
         obs = rearrange(obs, "c -> 1 1 c 1")
@@ -106,9 +137,23 @@ class RayIntegrator:
         torch.cuda.empty_cache()
 
         rays_with_obs = rearrange(rays_with_obs, "h w c s -> h w s c")
+        print("Debug: Before applying field function")
+        print(f"Shape of rays_with_obs: {rays_with_obs.shape}")
+        
         output_tensor = self.field(rays_with_obs, radius=6.9634e8, value=1.0)
+        # Debugging: Check the shape and type of output_tensor after applying the field function
+        print("Debug: After applying field function")
+        print(f"Shape of output_tensor: {output_tensor.shape}")
+        print(f"Type of output_tensor: {type(output_tensor)}")
+
+        # Debugging: Check memory usage of output_tensor
+        tensor_bytes = output_tensor.element_size() * output_tensor.nelement()
+        tensor_megabytes = tensor_bytes / (1024 ** 2)
+        print(f"output_tensor uses {tensor_megabytes:.2f} MB of memory")
 
         del rays_with_obs
+
+      
 
         return output_tensor
 
@@ -194,6 +239,9 @@ def integrate_field_linear(
     Returns:
         Integrated field image (2D tensor).
     """
+
+    print(f"Integrating field with dx={dx}, requires_grad={requires_grad}, device={device}")
+
 
     integration = RayIntegrator(
         field=field,

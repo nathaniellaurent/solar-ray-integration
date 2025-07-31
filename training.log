@@ -1,0 +1,47 @@
+2025-07-30 23:48:49,355 - solar_ray_integration.training.train - INFO - Starting training setup...
+Seed set to 42
+/home/nathaniel/anaconda3/envs/ray-integration/lib/python3.13/site-packages/torch/cuda/__init__.py:789: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+/home/nathaniel/anaconda3/envs/ray-integration/lib/python3.13/site-packages/torch/cuda/__init__.py:991: UserWarning: CUDA initialization: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 804: forward compatibility was attempted on non supported HW (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:109.)
+  r = torch._C._cuda_getDeviceCount() if nvml_count < 0 else nvml_count
+2025-07-30 23:48:49,366 - solar_ray_integration.training.train - WARNING - CUDA is not available. Falling back to CPU.
+2025-07-30 23:48:49,367 - solar_ray_integration.training.train - INFO - Initializing data module...
+Both every_n_train_steps and every_n_epochs are not set. Setting every_n_epochs=1
+Trainer: Initializing trainer with parameters: {'self': <pytorch_lightning.trainer.trainer.Trainer object at 0x79a50bc62e40>, 'accelerator': 'cpu', 'strategy': 'auto', 'devices': 'auto', 'num_nodes': 1, 'precision': '16-mixed', 'logger': False, 'callbacks': [<pytorch_lightning.callbacks.model_checkpoint.ModelCheckpoint object at 0x79a50bc623c0>, <pytorch_lightning.callbacks.early_stopping.EarlyStopping object at 0x79a50bc62ba0>, <pytorch_lightning.callbacks.lr_monitor.LearningRateMonitor object at 0x79a50bc62cf0>], 'fast_dev_run': False, 'max_epochs': 1, 'min_epochs': None, 'max_steps': -1, 'min_steps': None, 'max_time': None, 'limit_train_batches': None, 'limit_val_batches': None, 'limit_test_batches': None, 'limit_predict_batches': None, 'overfit_batches': 0.0, 'val_check_interval': None, 'check_val_every_n_epoch': 1, 'num_sanity_val_steps': 2, 'log_every_n_steps': 1, 'enable_checkpointing': None, 'enable_progress_bar': True, 'enable_model_summary': True, 'accumulate_grad_batches': 1, 'gradient_clip_val': None, 'gradient_clip_algorithm': None, 'deterministic': None, 'benchmark': None, 'inference_mode': True, 'use_distributed_sampler': True, 'profiler': None, 'detect_anomaly': True, 'barebones': False, 'plugins': None, 'sync_batchnorm': False, 'reload_dataloaders_every_n_epochs': 0, 'default_root_dir': None, 'model_registry': None, '__class__': <class 'pytorch_lightning.trainer.trainer.Trainer'>}
+/home/nathaniel/anaconda3/envs/ray-integration/lib/python3.13/site-packages/pytorch_lightning/trainer/connectors/accelerator_connector.py:513: You passed `Trainer(accelerator='cpu', precision='16-mixed')` but AMP with fp16 is not supported on CPU. Using `precision='bf16-mixed'` instead.
+Using bfloat16 Automatic Mixed Precision (AMP)
+You have turned on `Trainer(detect_anomaly=True)`. This will significantly slow down compute speed and is recommended only for model debugging.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+Traceback (most recent call last):
+  File "/home/nathaniel/solar-ray-integration/solar_ray_integration/training/train.py", line 199, in train_model
+    logger.info("Starting model training...")
+    ^^^^^^^^^^^
+AttributeError: 'bool' object has no attribute 'info'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/nathaniel/solar-ray-integration/solar_ray_integration/training/__main__.py", line 36, in <module>
+    main()
+    ~~~~^^
+  File "/home/nathaniel/solar-ray-integration/solar_ray_integration/training/__main__.py", line 25, in main
+    train_main()
+    ~~~~~~~~~~^^
+  File "/home/nathaniel/solar-ray-integration/solar_ray_integration/training/train.py", line 277, in main
+    train_model(
+    ~~~~~~~~~~~^
+        data_dir=args.data_dir,
+        ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<11 lines>...
+        resume_from_checkpoint=args.resume_from_checkpoint
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/nathaniel/solar-ray-integration/solar_ray_integration/training/train.py", line 232, in train_model
+    logger.error(f"Training failed with error: {str(e)}")
+    ^^^^^^^^^^^^
+AttributeError: 'bool' object has no attribute 'error'

@@ -92,6 +92,135 @@ Training outputs are saved to `outputs/` by default:
 - `logs/`: TensorBoard logs
 - `final_model.ckpt`: Final trained model
 
+## Debugging
+
+If training gets killed without clear error messages, try these debugging approaches:
+
+### 1. Enable Verbose Logging
+```bash
+# Run with verbose output and save logs
+python -m solar_ray_integration.training train --batch-size 1 --max-epochs 1 --gpus 0 2>&1 | tee training.log
+```
+
+### 2. Monitor System Resources
+```bash
+# In another terminal, monitor memory and CPU usage
+htop
+# or
+watch -n 1 'free -h && echo "CPU:" && top -bn1 | grep "Cpu(s)"'
+```
+
+### 3. Check for OOM (Out of Memory) Issues
+```bash
+# Check system logs for OOM killer messages
+sudo dmesg | grep -i "killed\|memory\|oom"
+# or
+journalctl -f | grep -i "killed\|memory\|oom"
+```
+
+### 4. Run with Reduced Resources
+```bash
+# Use smaller batch size and fewer workers
+python -m solar_ray_integration.training train --batch-size 1 --num-workers 1 --max-epochs 1
+```
+
+### 5. Profile Memory Usage
+```bash
+# Install memory profiler
+pip install memory-profiler
+
+# Run with memory profiling
+python -m memory_profiler -m solar_ray_integration.training train --batch-size 1 --max-epochs 1
+```
+
+## Requirements
+
+- PyTorch Lightning
+- PyTorch
+- Astropy
+- Matplotlib
+- NumPy
+- TensorBoard
+
+Install with:
+```bash
+pip install pytorch-lightning torch astropy matplotlib numpy tensorboard
+```
+
+
+
+### 1. Memory Optimization
+```bash
+# Use minimal memory settings
+python -m solar_ray_integration.training train \
+    --batch-size 1 \
+    --num-workers 0 \
+    --max-epochs 1 \
+    --gpus 0 \
+    --precision 32
+
+# Monitor memory usage while training
+free -h && python -m solar_ray_integration.training train --batch-size 1 --num-workers 0 --gpus 0
+```
+
+### 2. Reduce Model Size
+Edit the `nerf_config` in `train.py`:
+```python
+nerf_config = {
+    'd_input': 3,
+    'd_output': 1,
+    'n_layers': 2,    # Reduce from 8
+    'd_filter': 128,  # Reduce from 512
+    'encoding': 'positional'
+}
+```
+
+### 3. Enable Verbose Logging
+```bash
+# Run with verbose output and save logs
+python -m solar_ray_integration.training train --batch-size 1 --max-epochs 1 --gpus 0 2>&1 | tee training.log
+```
+
+### 4. Run with Reduced Resources
+```bash
+# Use minimal settings for testing
+python -m solar_ray_integration.training train \
+    --batch-size 1 \
+    --num-workers 0 \
+    --max-epochs 1 \
+    --gpus 0 \
+    --precision 32
+
+# Set memory limits (optional)
+ulimit -v 4000000  # Limit virtual memory to ~4GB
+python -m solar_ray_integration.training train --batch-size 1 --num-workers 0 --gpus 0
+```
+
+### 5. Profile Memory Usage
+```bash
+# Install memory profiler
+pip install memory-profiler
+
+# Run with memory profiling
+python -m memory_profiler -m solar_ray_integration.training train --batch-size 1 --max-epochs 1
+```
+
+## Memory Requirements
+
+Typical memory usage by configuration:
+
+| Batch Size | Model Size | Workers | Estimated RAM |
+|------------|------------|---------|---------------|
+| 1          | Small (2 layers, 128 width) | 0 | ~1-2 GB |
+| 1          | Medium (4 layers, 256 width) | 0 | ~2-4 GB |
+| 4          | Large (8 layers, 512 width) | 4 | ~8-16 GB |
+
+For systems with limited memory:
+- Use `--batch-size 1`
+- Use `--num-workers 0`
+- Use `--precision 32` (CPU only)
+- Reduce model size in code
+
 ## Requirements
 
 - PyTorch Lightning

@@ -12,8 +12,16 @@ from dask.diagnostics import ProgressBar
 
 import os
 
+# Add the parent directory to sys.path to ensure the module is discoverable
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from solar_ray_integration.ray_integration.integrate_field import integrate_field_linear, integrate_field_volumetric, integrate_field_volumetric_correction, integrate_field_volumetric_trapezoidal
+from solar_ray_integration.ray_integration.integrate_field import (
+    integrate_field_linear,
+    integrate_field_volumetric,
+    integrate_field_volumetric_correction,
+    integrate_field_volumetric_trapezoidal
+)
 
 
 
@@ -113,11 +121,11 @@ if __name__ == "__main__":
     # print(client.dashboard_link)
 
 
-    output_dir = "perspective_data/perspective_data_volumetric_fits_radial_trapezoidal"
+    output_dir = "perspective_data/perspective_data_linear_fits"
     os.makedirs(output_dir, exist_ok=True)
 
-    hgln_values = np.linspace(-180, 180, 2)
-    hglt_values = np.linspace(-90, 90, 2)
+    hgln_values = np.linspace(-180, 180, 10)
+    hglt_values = np.linspace(-90, 90, 10)
 
 
 
