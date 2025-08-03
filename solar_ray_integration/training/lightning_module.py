@@ -74,7 +74,7 @@ class SolarNerfLightningModule(pl.LightningModule):
         self.neural_renderer = NeuralSolarRenderer(
             nerf_config=nerf_config,
             dx=dx,
-            device=None,  # Will be set dynamically
+            device=device_type,
             integration_method=integration_method
         )
         

@@ -29,7 +29,7 @@ class NeuralSolarRenderer(nn.Module):
         self,
         nerf_config: dict = None,
         dx: float = 1e7,
-        device: str = None,
+        device: str = "cuda:0",
         integration_method: str = "linear"
     ):
         """
@@ -38,7 +38,7 @@ class NeuralSolarRenderer(nn.Module):
         Args:
             nerf_config: Configuration dictionary for the NeRF model.
             dx: Step size along the ray in meters.
-            device: Device for computation (None for auto-detection).
+            device: Device for computation ('cuda:0' for GPU, 'cpu' for CPU).
             integration_method: Integration method ('linear', 'volumetric', 'volumetric_correction').
         """
         super().__init__()
@@ -70,8 +70,6 @@ class NeuralSolarRenderer(nn.Module):
             Rendered image as a 2D tensor.
         """
         
-        # Auto-detect device from model parameters
-        current_device = next(self.nerf.parameters()).device
         
         # Integrate based on method
         if self.integration_method == "linear":
@@ -80,7 +78,7 @@ class NeuralSolarRenderer(nn.Module):
                 source_hdu=source_hdu,
                 dx=self.dx,
                 requires_grad=requires_grad,
-                device=current_device
+                device=self.device
             )
             
         elif self.integration_method == "volumetric":
@@ -89,7 +87,7 @@ class NeuralSolarRenderer(nn.Module):
                 source_hdu=source_hdu,
                 dx=self.dx,
                 requires_grad=requires_grad,
-                device=current_device
+                device=self.device
             )
             
         elif self.integration_method == "volumetric_correction":
@@ -98,7 +96,7 @@ class NeuralSolarRenderer(nn.Module):
                 source_hdu=source_hdu,
                 dx=self.dx,
                 requires_grad=requires_grad,
-                device=current_device
+                device=self.device
             )
             
         else:

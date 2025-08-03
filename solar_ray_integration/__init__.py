@@ -9,8 +9,6 @@ from .model import NeRF, EmissionModel, Sine, TrainablePositionalEncoding, Posit
 from .ray_integration import RayIntegrator, integrate_field_linear, integrate_field_volumetric, integrate_field_volumetric_correction
 from .rendering import NeuralSolarRenderer
 
-__version__ = "0.1.0"
-__author__ = "Solar Ray Integration Team"
 
 __all__ = [
     # Model components
