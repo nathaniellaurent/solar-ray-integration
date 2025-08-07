@@ -5,6 +5,8 @@ from astropy.wcs import WCS
 from astropy.io.fits import PrimaryHDU
 from sunpy.data.sample import AIA_193_JUN2012, STEREO_A_195_JUN2012
 import matplotlib.pyplot as plt
+import sunpy.map
+import astropy.units as u
 
 
 from dask import delayed, compute
@@ -121,7 +123,7 @@ if __name__ == "__main__":
     # print(client.dashboard_link)
 
 
-    output_dir = "perspective_data/perspective_data_linear_fits"
+    output_dir = "perspective_data/perspective_data_linear_fits_small"
     os.makedirs(output_dir, exist_ok=True)
 
     hgln_values = np.linspace(-180, 180, 10)
@@ -144,10 +146,18 @@ if __name__ == "__main__":
             source_data = source_hdu.data
         source_wcs.wcs.aux.hglt_obs = float(hglt)
         source_wcs.wcs.aux.hgln_obs = float(hgln)
+        # print(f"Loaded source data for idx {idx} with shape {source_data.shape}")        
+
+        # Use sunpy to resample the image to 128 x 128
+        source_map = sunpy.map.Map(source_data, source_hdu.header)
+        resampled_map = source_map.resample((128, 128) * u.pixel)
+        source_data = resampled_map.data
+        source_wcs = resampled_map.wcs
+
         temp_hdu = PrimaryHDU(source_data, header=source_wcs.to_header())
 
-        output_tensor = integrate_field_volumetric_trapezoidal(
-            sun_sphere_scalar_radial,
+        output_tensor = integrate_field_linear(
+            sun_sphere_scalar,
             temp_hdu,
             dx=1e7,
             requires_grad=False,

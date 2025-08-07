@@ -1,25 +1,3 @@
-"""
-Main training scdef train(
-    data_dir: str = "perspective_data/perspective_data_linear_fits",
-    output_dir: str = "outputs",
-    experiment_name: str = "solar_nerf",
-    batch_size: int = 4,
-    max_epochs: int = 100,
-    learning_rate: float = 5e-4,
-    weight_decay: float = 1e-6,
-    integration_method: str = "linear",
-    num_workers: int = 4,
-    gpus: int = 1,
-    precision: str = "16-mixed",
-    seed: int = 42,
-    resume_from_checkpoint: str = None,
-    **kwargs
-):RF models.
-
-This script sets up the training pipeline using PyTorch Lightning
-and trains a neural radiance field model on solar perspective data.
-"""
-
 import os
 import sys
 import argparse
@@ -34,7 +12,7 @@ from .lightning_module import SolarNerfLightningModule
 
 
 def train_model(
-    data_dir: str = "perspective_data/perspective_data_linear_fits",
+    data_dir: str = "perspective_data/perspective_data_linear_fits_small",
     output_dir: str = "outputs",
     experiment_name: str = "solar_nerf",
     batch_size: int = 4,
@@ -42,7 +20,6 @@ def train_model(
     learning_rate: float = 5e-4,
     weight_decay: float = 1e-6,
     integration_method: str = "linear",
-    image_size: tuple = (512, 512),
     num_workers: int = 4,
     gpus: int = 1,
     precision: str = "16-mixed",
@@ -93,6 +70,8 @@ def train_model(
     }
     
     # Initialize model
+    device = "cpu" if gpus < 1 else "cuda:0"
+    print(f"Using device: {device}")
     model = SolarNerfLightningModule(
         nerf_config=nerf_config,
         integration_method=integration_method,
@@ -104,17 +83,17 @@ def train_model(
         device="cpu" if gpus < 1 else "cuda:0"
     )
     
-    # Callbacks
+        # Callbacks
     callbacks = [
         # Model checkpointing
         ModelCheckpoint(
             dirpath=output_path / "checkpoints",
-            filename="solar_nerf-{epoch:02d}-{val_loss:.4f}",
+            filename="solar_nerf-{epoch:02d}-{val_loss:.3f}",
             monitor="val_loss",
             mode="min",
             save_top_k=3,
             save_last=True,
-            verbose=True
+            every_n_epochs=1
         ),
         
         # Early stopping
@@ -123,10 +102,7 @@ def train_model(
             mode="min",
             patience=20,
             verbose=True
-        ),
-        
-        # Learning rate monitoring
-        LearningRateMonitor(logging_interval="epoch")
+        )
     ]
     
     # Logger - temporarily disabled due to protobuf/tensorboard conflict
@@ -136,6 +112,10 @@ def train_model(
     #     version=None  # Auto-increment version
     # )
     logger = False  # Disable logging temporarily
+    
+    # Add LearningRateMonitor only if logger is enabled
+    if logger is not False:
+        callbacks.append(LearningRateMonitor(logging_interval="epoch"))
     
     # Trainer
     trainer = pl.Trainer(
@@ -190,7 +170,7 @@ def main():
     
     # Data arguments
     parser.add_argument("--data-dir", type=str, 
-                       default="perspective_data/perspective_data_linear_fits",
+                       default="perspective_data/perspective_data_linear_fits_small",
                        help="Directory containing FITS files")
     parser.add_argument("--output-dir", type=str, default="outputs",
                        help="Output directory")

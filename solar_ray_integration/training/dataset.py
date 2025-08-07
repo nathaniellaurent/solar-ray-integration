@@ -36,7 +36,8 @@ class SolarPerspectiveDataset(Dataset):
         self,
         data_dir: str,
         transform: Optional[Any] = None,
-        normalize: bool = True
+        normalize: bool = True,
+        normalization_value: float = 1.0
     ):
         """
         Initialize the dataset.
@@ -45,10 +46,12 @@ class SolarPerspectiveDataset(Dataset):
             data_dir: Directory containing FITS files
             transform: Optional transform to apply to images
             normalize: Whether to normalize image values
+            normalization_value: Fixed value to divide pixel values by for normalization
         """
         self.data_dir = data_dir
         self.transform = transform
         self.normalize = normalize
+        self.normalization_value = normalization_value
         
         # Find all FITS files
         self.fits_files = glob.glob(os.path.join(data_dir, "*.fits"))
@@ -118,11 +121,8 @@ class SolarPerspectiveDataset(Dataset):
         
         # Normalize if requested
         if self.normalize:
-            # Normalize to [0, 1] range
-            image_min = image_tensor.min()
-            image_max = image_tensor.max()
-            if image_max > image_min:
-                image_tensor = (image_tensor - image_min) / (image_max - image_min)
+            # Normalize by dividing by the specified normalization value
+            image_tensor = image_tensor / self.normalization_value
         
         # Extract WCS parameters (simplified)
         wcs_params = torch.tensor([
@@ -164,6 +164,7 @@ class SolarPerspectiveDataModule(pl.LightningDataModule):
         val_split: float = 0.1,
         test_split: float = 0.1,
         normalize: bool = True,
+        normalization_value: float = 139.0,
         seed: int = 42
     ):
         """
@@ -177,6 +178,7 @@ class SolarPerspectiveDataModule(pl.LightningDataModule):
             val_split: Fraction of data for validation
             test_split: Fraction of data for testing
             normalize: Whether to normalize images
+            normalization_value: Fixed value to divide pixel values by for normalization
             seed: Random seed for data splitting
         """
         super().__init__()
@@ -187,6 +189,7 @@ class SolarPerspectiveDataModule(pl.LightningDataModule):
         self.val_split = val_split
         self.test_split = test_split
         self.normalize = normalize
+        self.normalization_value = normalization_value
         self.seed = seed
         
         # Ensure splits sum to 1
@@ -199,7 +202,8 @@ class SolarPerspectiveDataModule(pl.LightningDataModule):
         # Create full dataset
         full_dataset = SolarPerspectiveDataset(
             data_dir=self.data_dir,
-            normalize=self.normalize
+            normalize=self.normalize,
+            normalization_value=self.normalization_value
         )
         
         # Split dataset

@@ -17,7 +17,7 @@ from .lightning_module import SolarNerfLightningModule
 from .config import get_config, create_config_template
 
 
-def test_dataset(data_dir: str = "perspective_data/perspective_data_linear_fits"):
+def test_dataset(data_dir: str = "perspective_data/perspective_data_linear_fits_small"):
     """Test the dataset loading."""
     print(f"Testing dataset loading from: {data_dir}")
     
@@ -47,7 +47,7 @@ def test_dataset(data_dir: str = "perspective_data/perspective_data_linear_fits"
         return False
 
 
-def visualize_samples(data_dir: str = "perspective_data/perspective_data_linear_fits", 
+def visualize_samples(data_dir: str = "perspective_data/perspective_data_linear_fits_small", 
                      num_samples: int = 4):
     """Visualize sample images from the dataset."""
     try:
@@ -78,7 +78,7 @@ def visualize_samples(data_dir: str = "perspective_data/perspective_data_linear_
         return False
 
 
-def test_datamodule(data_dir: str = "perspective_data/perspective_data_linear_fits"):
+def test_datamodule(data_dir: str = "perspective_data/perspective_data_linear_fits_small"):
     """Test the PyTorch Lightning data module."""
     print("Testing DataModule...")
     
@@ -133,7 +133,7 @@ def test_model():
         return False
 
 
-def run_full_test(data_dir: str = "perspective_data/perspective_data_linear_fits"):
+def run_full_test(data_dir: str = "perspective_data/perspective_data_linear_fits_small"):
     """Run complete test suite."""
     print("="*50)
     print("Running Solar NeRF Training Pipeline Tests")
@@ -177,7 +177,7 @@ def main():
     
     parser = argparse.ArgumentParser(description="Test Solar NeRF training pipeline")
     parser.add_argument("--data-dir", type=str, 
-                       default="perspective_data/perspective_data_linear_fits",
+                       default="perspective_data/perspective_data_linear_fits_small",
                        help="Data directory")
     parser.add_argument("--action", type=str, default="test",
                        choices=["test", "visualize", "config"],

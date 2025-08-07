@@ -53,7 +53,7 @@ class NeuralSolarRenderer(nn.Module):
                 'encoding': 'positional'
             }
         
-        self.nerf = NeRF(**nerf_config)
+        self.nerf = NeRF(device=device, **nerf_config)
         self.dx = dx
         self.device = device
         self.integration_method = integration_method
@@ -69,10 +69,17 @@ class NeuralSolarRenderer(nn.Module):
         Returns:
             Rendered image as a 2D tensor.
         """
+
+        print("source_hdu data shape:", source_hdu.data.shape)
+        if hasattr(source_hdu, 'header') and 'NAXIS1' in source_hdu.header and 'NAXIS2' in source_hdu.header:
+            print("WCS shape from header: (NAXIS2, NAXIS1) =", (source_hdu.header['NAXIS2'], source_hdu.header['NAXIS1']))
+        else:
+            print("WCS shape info not found in header.")
         
         
         # Integrate based on method
         if self.integration_method == "linear":
+            print("Device being used for integration:", self.device)
             output_tensor = integrate_field_linear(
                 field=self.neural_field,
                 source_hdu=source_hdu,

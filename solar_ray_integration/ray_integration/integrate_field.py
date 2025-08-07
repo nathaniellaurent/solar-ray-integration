@@ -74,12 +74,8 @@ class RayIntegrator:
     def generate_ray_tensor(self):
         
 
-        source_hdu = TensorHDU(torch.tensor(self.source_hdu.data, requires_grad=True, device=self.device), self.source_hdu.header)
         source_wcs = self.source_wcs
 
-        
-
-        
 
         obs, rays = calculate_rays(
             source_wcs=source_wcs,

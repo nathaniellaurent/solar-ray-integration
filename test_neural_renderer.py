@@ -107,7 +107,8 @@ def test_neural_renderer_random_weights(
     integration_method: str = "linear",
     image_size: tuple = (256, 256),  # Smaller for faster testing
     device: str = "cpu",
-    nerf_config: Optional[dict] = None
+    nerf_config: Optional[dict] = None,
+    preserve_grad: bool = False
 ):
     """
     Test NeuralSolarRenderer with random weights.
@@ -117,10 +118,12 @@ def test_neural_renderer_random_weights(
         image_size: Size of test image
         device: Device to run on
         nerf_config: NeRF configuration (None for default)
+        preserve_grad: If True, enables gradients for training-like conditions
     """
     print(f"Testing NeuralSolarRenderer with {integration_method} integration")
     print(f"Image size: {image_size}")
     print(f"Device: {device}")
+    print(f"Preserve gradients: {preserve_grad}")
     
     try:
         # Create smaller NeRF config for faster testing
@@ -128,15 +131,15 @@ def test_neural_renderer_random_weights(
             nerf_config = {
                 'd_input': 3,
                 'd_output': 1,
-                'n_layers': 4,      # Reduced from 8
-                'd_filter': 128,    # Reduced from 512
-                'encoding': 'positional'
+                'n_layers': 4,  # Reduced from 8 to 4
+                'd_filter': 128,  # Reduced from 512 to 128
+                'encoding': None #'positional'
             }
         
         # Create neural renderer
         renderer = NeuralSolarRenderer(
             nerf_config=nerf_config,
-            dx=2e7,  # Larger step size for faster computation
+            dx=1e7,  # Larger step size for faster computation
             device=device,  # Let it auto-detect device
             integration_method=integration_method
         )
@@ -144,12 +147,23 @@ def test_neural_renderer_random_weights(
         # Move to device
         renderer = renderer.to(device)
         
+        # Set gradient mode for renderer parameters
+        if preserve_grad:
+            renderer.train()  # Set to training mode
+            for param in renderer.parameters():
+                param.requires_grad_(True)
+        else:
+            renderer.eval()  # Set to evaluation mode
+            for param in renderer.parameters():
+                param.requires_grad_(False)
+        
         print(f"✓ Renderer created successfully")
         print(f"  NeRF parameters: {sum(p.numel() for p in renderer.nerf.parameters()):,}")
+        print(f"  Gradients enabled: {preserve_grad}")
         
         # Use dummy HDU to avoid byte order issues with real FITS files
         test_hdu = create_dummy_fits_hdu(
-            image_size=(1024, 1024),  # Use full resolution for testing
+            image_size=image_size,  # Use full resolution for testing
             hgln_obs=0.0,
             hglt_obs=0.0
         )
@@ -160,14 +174,35 @@ def test_neural_renderer_random_weights(
         print(f"  WCS created with {wcs.wcs.ctype[0]}, {wcs.wcs.ctype[1]}")
         # Test forward pass
         print("Running forward pass...")
-        with torch.no_grad():  # No gradients needed for testing
+        
+        # Use gradient context based on preserve_grad setting
+        gradient_context = torch.enable_grad() if preserve_grad else torch.no_grad()
+        
+        with gradient_context:
             start_time = torch.cuda.Event(enable_timing=True) if device.startswith('cuda') else None
             end_time = torch.cuda.Event(enable_timing=True) if device.startswith('cuda') else None
             
             if start_time:
                 start_time.record()
             
-            rendered_image = renderer(test_hdu, requires_grad=False)
+            rendered_image = renderer(test_hdu, requires_grad=preserve_grad)
+            
+            # If preserving gradients, simulate a training step
+            if preserve_grad and rendered_image.requires_grad:
+                # Create a dummy loss (sum of all pixels)
+                dummy_loss = rendered_image.sum()
+                print(f"  Dummy loss for gradient test: {dummy_loss.item():.6f}")
+                
+                # Compute gradients
+                dummy_loss.backward()
+                print(f"  ✓ Backward pass completed")
+                
+                # Check if gradients were computed
+                grad_check = any(p.grad is not None for p in renderer.parameters() if p.requires_grad)
+                print(f"  Gradients computed: {grad_check}")
+                
+                # Clear gradients for next iteration
+                renderer.zero_grad()
             
             if end_time:
                 end_time.record()
@@ -201,9 +236,10 @@ def test_neural_renderer_random_weights(
         return None, None
 
 
-def test_different_viewing_angles(renderer, base_hdu, device="cpu"):
+def test_different_viewing_angles(renderer, base_hdu, device="cpu", preserve_grad=False):
     """Test renderer with different viewing angles."""
     print("\nTesting different viewing angles...")
+    print(f"Preserve gradients: {preserve_grad}")
     
     viewing_angles = [
         (0.0, 0.0),     # Front view
@@ -213,6 +249,8 @@ def test_different_viewing_angles(renderer, base_hdu, device="cpu"):
     ]
     
     results = []
+    
+    gradient_context = torch.enable_grad() if preserve_grad else torch.no_grad()
     
     for hgln, hglt in viewing_angles:
         print(f"  Testing HGLN={hgln}°, HGLT={hglt}°")
@@ -224,11 +262,23 @@ def test_different_viewing_angles(renderer, base_hdu, device="cpu"):
             hglt_obs=hglt
         )
         
-        with torch.no_grad():
-            rendered = renderer(test_hdu, requires_grad=False)
-            results.append((hgln, hglt, rendered))
+        with gradient_context:
+            rendered = renderer(test_hdu, requires_grad=preserve_grad)
+            
+            # If preserving gradients, simulate training-like memory usage
+            if preserve_grad and rendered.requires_grad:
+                # Keep gradients in memory by not calling backward immediately
+                # This simulates accumulating gradients across multiple samples
+                pass
+            
+            # Detach for results storage to avoid memory accumulation
+            results.append((hgln, hglt, rendered.detach().clone()))
             
         print(f"    Output range: [{rendered.min().item():.6f}, {rendered.max().item():.6f}]")
+        
+        # Clear gradients periodically if preserving them
+        if preserve_grad:
+            renderer.zero_grad()
     
     return results
 
@@ -275,6 +325,13 @@ def main():
     # Test configuration
     device = "cpu"  # Use CPU for testing to avoid GPU memory issues
     image_size = (128, 128)  # Full resolution for testing
+    preserve_grad = True  # Set to True for training-like conditions, False for inference-like
+    
+    print(f"Configuration:")
+    print(f"  Device: {device}")
+    print(f"  Image size: {image_size}")
+    print(f"  Preserve gradients: {preserve_grad}")
+    print(f"  Training-like conditions: {'Yes' if preserve_grad else 'No'}")
     
     # Test all integration methods
     integration_methods = ["linear"]
@@ -290,7 +347,8 @@ def main():
         rendered_image, renderer = test_neural_renderer_random_weights(
             integration_method=method,
             image_size=image_size,
-            device=device
+            device=device,
+            preserve_grad=preserve_grad
         )
         
         if rendered_image is not None and renderer is not None:
@@ -298,7 +356,9 @@ def main():
             base_hdu = create_dummy_fits_hdu(image_size=image_size)
             
             # Test different viewing angles
-            angle_results = test_different_viewing_angles(renderer, base_hdu, device)
+            angle_results = test_different_viewing_angles(
+                renderer, base_hdu, device, preserve_grad=preserve_grad
+            )
             all_results.extend([(method, *result) for result in angle_results])
             
             print(f"✓ {method} integration test passed")
@@ -314,6 +374,12 @@ def main():
     
     print(f"\n{'='*60}")
     print("Testing completed!")
+    if preserve_grad:
+        print("Note: Test was run with gradient computation enabled")
+        print("Memory usage and timing reflect training-like conditions")
+    else:
+        print("Note: Test was run with gradients disabled")
+        print("Memory usage and timing reflect inference-like conditions")
     print(f"{'='*60}")
 
 

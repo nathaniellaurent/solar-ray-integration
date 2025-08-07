@@ -39,7 +39,7 @@ class SolarNerfLightningModule(pl.LightningModule):
         scheduler_type: str = "cosine",
         loss_type: str = "mse",
         dx: float = 1e7,
-        device_type: str = "cuda:0",
+        device: str = "cuda:0",
         log_images_every_n_epochs: int = 10,
         **kwargs
     ):
@@ -71,10 +71,11 @@ class SolarNerfLightningModule(pl.LightningModule):
             }
         
         # Initialize the neural renderer
+        print(f"Using device: {device} (used for NeuralSolarRenderer and ray integration)")
         self.neural_renderer = NeuralSolarRenderer(
             nerf_config=nerf_config,
             dx=dx,
-            device=device_type,
+            device=device,
             integration_method=integration_method
         )
         
@@ -245,8 +246,8 @@ class SolarNerfLightningModule(pl.LightningModule):
     def _log_sample_images(self, predicted: torch.Tensor, target: torch.Tensor, batch: Dict[str, torch.Tensor]):
         """Log sample images to tensorboard."""
         # Take first image from batch
-        pred_img = predicted[0].detach().cpu().numpy()
-        target_img = target[0].detach().cpu().numpy()
+        pred_img = predicted[0].detach().cpu().float().numpy()
+        target_img = target[0].detach().cpu().float().numpy()
         
         # Create comparison figure
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
@@ -275,12 +276,13 @@ class SolarNerfLightningModule(pl.LightningModule):
         hglt = batch['hglt'][0].item()
         fig.suptitle(f'Epoch {self.current_epoch}, HGLN={hgln:.1f}°, HGLT={hglt:.1f}°')
         
-        # Log to tensorboard
-        self.logger.experiment.add_figure(
-            'sample_images',
-            fig,
-            global_step=self.current_epoch
-        )
+        # Log to tensorboard (only if logger is available)
+        if self.logger is not None and hasattr(self.logger, 'experiment'):
+            self.logger.experiment.add_figure(
+                'sample_images',
+                fig,
+                global_step=self.current_epoch
+            )
         
         plt.close(fig)
     

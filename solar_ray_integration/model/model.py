@@ -16,7 +16,8 @@ class NeRF(nn.Module):
             n_layers: int = 8,
             d_filter: int = 512,
             skip: Tuple[int] = (),
-            encoding='positional'
+            encoding='positional',
+            device: str = 'cuda:0',
     ):
         super().__init__()
         self.d_input = d_input
@@ -40,6 +41,9 @@ class NeRF(nn.Module):
         self.layers = nn.ModuleList([nn.Linear(d_filter, d_filter) for i in range(n_layers - 1)])
 
         self.out_layer = nn.Linear(d_filter, d_output)
+        
+        # Move model to specified device
+        self.to(device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         r"""
@@ -47,6 +51,13 @@ class NeRF(nn.Module):
         """
 
         # Apply forward pass
+
+        print("Input to NeRF:", x)
+        print("Input device:", x.device)
+        print("in_layer device:", next(self.in_layer.parameters()).device)
+        for i, layer in enumerate(self.layers):
+            print(f"Layer {i} device:", next(layer.parameters()).device)
+        print("out_layer device:", next(self.out_layer.parameters()).device)
         x = self.act(self.in_layer(x))
         for i, layer in enumerate(self.layers):
             x = self.act(layer(x))
@@ -54,13 +65,15 @@ class NeRF(nn.Module):
             #     x = torch.cat([x, x_input], dim=-1)
         x = self.out_layer(x)
 
+        print("Output passed through NeRF:", x)
+
         return x
 
 
 class EmissionModel(NeRF):
 
-    def __init__(self, **kwargs):
-        super().__init__(d_input=4, d_output=2, **kwargs)
+    def __init__(self, device: str = 'cuda:0', **kwargs):
+        super().__init__(d_input=4, d_output=2, device=device, **kwargs)
 
 
 class Sine(nn.Module):
