@@ -5,17 +5,25 @@ from astropy.wcs import WCS
 from astropy.io.fits import PrimaryHDU
 from sunpy.data.sample import AIA_193_JUN2012, STEREO_A_195_JUN2012
 import matplotlib.pyplot as plt
+import sunpy.map
+import astropy.units as u
 
 
 from dask import delayed, compute
 from dask.diagnostics import ProgressBar
 
 import os
+
+# Add the parent directory to sys.path to ensure the module is discoverable
 import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-sys.path.append("src")  
-
-from ray_integration.integrate_field import integrate_field_linear, integrate_field_volumetric, integrate_field_volumetric_correction
+from solar_ray_integration.ray_integration.integrate_field import (
+    calculate_field_linear,
+    calculate_field_volumetric,
+    calculate_field_volumetric_correction,
+    calculate_field_volumetric_trapezoidal
+)
 
 
 
@@ -115,11 +123,11 @@ if __name__ == "__main__":
     # print(client.dashboard_link)
 
 
-    output_dir = "perspective_data/perspective_data_linear_fits_test"
+    output_dir = "perspective_data/perspective_data_linear_fits_small"
     os.makedirs(output_dir, exist_ok=True)
 
-    hgln_values = np.linspace(-180, 180, 1)
-    hglt_values = np.linspace(-90, 90, 1)
+    hgln_values = np.linspace(-180, 180, 10)
+    hglt_values = np.linspace(-90, 90, 10)
 
 
 
@@ -136,16 +144,25 @@ if __name__ == "__main__":
             source_hdu = hdul[1]
             source_wcs = WCS(source_hdu.header)
             source_data = source_hdu.data
+        
+        # print(f"Loaded source data for idx {idx} with shape {source_data.shape}")        
+
+        # Use sunpy to resample the image to 128 x 128
+        source_map = sunpy.map.Map(source_data, source_hdu.header)
+        resampled_map = source_map.resample((128, 128) * u.pixel)
+        source_data = resampled_map.data
+        source_wcs = resampled_map.wcs
         source_wcs.wcs.aux.hglt_obs = float(hglt)
         source_wcs.wcs.aux.hgln_obs = float(hgln)
+
         temp_hdu = PrimaryHDU(source_data, header=source_wcs.to_header())
 
-        output_tensor = integrate_field_volumetric_correction(
+        output_tensor = calculate_field_linear(
             sun_sphere_scalar,
             temp_hdu,
             dx=1e7,
             requires_grad=False,
-            device='cuda:0'
+            device='cpu'
         )
         
         output_hdu = PrimaryHDU(output_tensor.cpu().detach().numpy(), header=source_wcs.to_header())
@@ -169,7 +186,7 @@ if __name__ == "__main__":
             idx += 1
 
     with ProgressBar():
-        results = compute(*tasks, scheduler='processes', num_workers=2)
+        results = compute(*tasks, scheduler='threads', num_workers=1)
 
 
     for idx, (output_hdu, fits_filename) in enumerate(results):

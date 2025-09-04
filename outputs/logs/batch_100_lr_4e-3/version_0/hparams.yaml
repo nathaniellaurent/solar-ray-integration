@@ -1,0 +1,17 @@
+accumulate_grad_batches: 1
+checkpoint_dir: checkpoints/solar_nerf
+checkpoint_monitor: val_loss
+device: cuda:0
+dx: 10000000.0
+image_save_dir: outputs/images
+learning_rate: 0.004
+loss_type: mse
+nerf_config:
+  d_filter: 64
+  d_input: 3
+  d_output: 1
+  encoding: positional
+  n_layers: 4
+save_top_k: 3
+scheduler_type: null
+weight_decay: 0.0
