@@ -24,4 +24,4 @@ dependencies:
     - torchvision
     - torchaudio
     - pytorch-lightning
-    - -e /home/nathaniel/dfreproject
+    - -e /home/nlaurent/dfreproject

@@ -19,10 +19,10 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from solar_ray_integration.ray_integration.integrate_field import (
-    integrate_field_linear,
-    integrate_field_volumetric,
-    integrate_field_volumetric_correction,
-    integrate_field_volumetric_trapezoidal
+    calculate_field_linear,
+    calculate_field_volumetric,
+    calculate_field_volumetric_correction,
+    calculate_field_volumetric_trapezoidal
 )
 
 
@@ -144,8 +144,7 @@ if __name__ == "__main__":
             source_hdu = hdul[1]
             source_wcs = WCS(source_hdu.header)
             source_data = source_hdu.data
-        source_wcs.wcs.aux.hglt_obs = float(hglt)
-        source_wcs.wcs.aux.hgln_obs = float(hgln)
+        
         # print(f"Loaded source data for idx {idx} with shape {source_data.shape}")        
 
         # Use sunpy to resample the image to 128 x 128
@@ -153,10 +152,12 @@ if __name__ == "__main__":
         resampled_map = source_map.resample((128, 128) * u.pixel)
         source_data = resampled_map.data
         source_wcs = resampled_map.wcs
+        source_wcs.wcs.aux.hglt_obs = float(hglt)
+        source_wcs.wcs.aux.hgln_obs = float(hgln)
 
         temp_hdu = PrimaryHDU(source_data, header=source_wcs.to_header())
 
-        output_tensor = integrate_field_linear(
+        output_tensor = calculate_field_linear(
             sun_sphere_scalar,
             temp_hdu,
             dx=1e7,

@@ -56,7 +56,7 @@ class RayIntegrator:
             self.rsun = torch.tensor(self.source_wcs.wcs.aux.rsun_ref, dtype=torch.float32, requires_grad=self.requires_grad, device=self.device)
         else:
             self.rsun = torch.tensor(6.957e8, dtype=torch.float32, requires_grad=self.requires_grad, device=self.device)
-
+        print(f"dsun_obs: {self.dsun}, rsun_ref: {self.rsun}")
         self.steps = self.create_steps()
 
     def create_steps(self):
@@ -75,6 +75,10 @@ class RayIntegrator:
         
 
         source_wcs = self.source_wcs
+
+        hglt = source_wcs.wcs.aux.hglt_obs if hasattr(source_wcs.wcs.aux, "hglt_obs") else None
+        hgln = source_wcs.wcs.aux.hgln_obs if hasattr(source_wcs.wcs.aux, "hgln_obs") else None
+        print(f"hglt_obs: {hglt}, hgln_obs: {hgln}")
 
 
         obs, rays = calculate_rays(
@@ -152,6 +156,8 @@ class RayIntegrator:
       
 
         return output_tensor
+    
+    
 
     def generate_area_tensor(self):
 
@@ -214,204 +220,50 @@ class RayIntegrator:
     def generate_correction(self):
         return 1 / (self.steps ** 2)
 
+    def calculate_field_linear(self) -> torch.Tensor:
+        """Integrate field with simple summation along steps."""
+        output = self.generate_ray_tensor()          # (H,W,S)
+        torch.cuda.empty_cache()
+        return output
 
-def integrate_field_linear(
-    field: Callable[[torch.Tensor, Any], torch.Tensor],
-    source_hdu: Any,
-    dx: float = 1e7,
-    requires_grad: bool = False,
-    device: str = "cuda:0"
-) -> torch.Tensor:
-    """
-    Integrate a scalar field along rays from the observer through the solar volume.
+    def calculate_field_volumetric(self) -> torch.Tensor:
+        """Integrate field including pixel area weighting."""
+        output = self.generate_ray_tensor()          # (H,W,S)
+        area = self.generate_area_tensor()           # (H,W,S)
+        output = output * area
+        del area
+        torch.cuda.empty_cache()
+        return output
 
-    Args:
-        field: Function that evaluates the scalar field at given coordinates.
-        source_hdu: FITS HDU containing image data and header.
-        dx: Step size along the ray in meters.
-        requires_grad: If True, enables autograd for PyTorch tensors.
-        device: Device for computation ('cuda:0' for GPU, 'cpu' for CPU).
+    def calculate_field_volumetric_trapezoidal(self) -> torch.Tensor:
+        """Integrate field with pixel area weighting using trapezoidal rule along ray steps."""
+        output = self.generate_ray_tensor()          # (H,W,S)
+        # Trapezoidal averaging along step dimension
+        output_1 = torch.cat([torch.zeros_like(output[:, :, :1]), output], dim=2)
+        output_2 = torch.cat([output, torch.zeros_like(output[:, :, :1])], dim=2)
+        output = (output_1 + output_2) / 2
+        del output_1, output_2
+        output = output[:, :, 1:-1]                  # Remove padded ends -> (H,W,S-1)
+        area = self.generate_area_tensor()           # (H,W,S)
+        area = area[:, :, :-1]                       # Match (H,W,S-1)
+        output = output * area
+        del area
+        torch.cuda.empty_cache()
+        return output
 
-    Returns:
-        Integrated field image (2D tensor).
-    """
-
-    print(f"Integrating field with dx={dx}, requires_grad={requires_grad}, device={device}")
-
-
-    integration = RayIntegrator(
-        field=field,
-        source_hdu=source_hdu,
-        dx=dx,
-        requires_grad=requires_grad,
-        device=device
-    )
-
-    output_tensor = integration.generate_ray_tensor()
+    def calculate_field_volumetric_correction(self) -> torch.Tensor:
+        """Integrate field with pixel area and 1/r^2 correction."""
+        output = self.generate_ray_tensor()          # (H,W,S)
+        area = self.generate_area_tensor()           # (H,W,S)
+        output = output * area
+        correction = self.generate_correction()      # (1,1,1,S)
+        correction = rearrange(correction, '1 1 1 s -> 1 1 s')  # (1,1,S) broadcast
+        output = output * correction
         
-    
-    
-    output_tensor = reduce(output_tensor, 'h w s -> h w', 'sum')
+        del area, correction
+        torch.cuda.empty_cache()
+        return output
 
-    torch.cuda.empty_cache()
-
-    return output_tensor
-
-
-def integrate_field_volumetric(
-    field: Callable[[torch.Tensor, Any], torch.Tensor],
-    source_hdu: Any,
-    dx: float = 1e7,
-    requires_grad: bool = False,
-    device: str = "cuda:0"
-) -> torch.Tensor:
-    """
-    Integrate a scalar field along rays, including pixel area correction.
-
-    Args:
-        field: Function that evaluates the scalar field at given coordinates.
-        source_hdu: FITS HDU containing image data and header.
-        dx: Step size along the ray in meters.
-        requires_grad: If True, enables autograd for PyTorch tensors.
-        device: Device for computation ('cuda:0' for GPU, 'cpu' for CPU).
-
-    Returns:
-        Integrated field image (2D tensor) with pixel area correction.
-    """
-
-    integration = RayIntegrator(
-        field=field,
-        source_hdu=source_hdu,
-        dx=dx,
-        requires_grad=requires_grad,
-        device=device
-    )
-
-    output_tensor = integration.generate_ray_tensor()
-    
-    area = integration.generate_area_tensor()
-
-    output_tensor = output_tensor * area
-    
-    del area
-
-
-    output_tensor = reduce(output_tensor, 'h w s -> h w', 'sum')
-    torch.cuda.empty_cache()
-
-    return output_tensor
-
-def integrate_field_volumetric_trapezoidal(
-    field: Callable[[torch.Tensor, Any], torch.Tensor],
-    source_hdu: Any,
-    dx: float = 1e7,
-    requires_grad: bool = False,
-    device: str = "cuda:0"
-) -> torch.Tensor:
-    """
-    Integrate a scalar field along rays, including pixel area correction.
-
-    Args:
-        field: Function that evaluates the scalar field at given coordinates.
-        source_hdu: FITS HDU containing image data and header.
-        dx: Step size along the ray in meters.
-        requires_grad: If True, enables autograd for PyTorch tensors.
-        device: Device for computation ('cuda:0' for GPU, 'cpu' for CPU).
-
-    Returns:
-        Integrated field image (2D tensor) with pixel area correction.
-    """
-
-    integration = RayIntegrator(
-        field=field,
-        source_hdu=source_hdu,
-        dx=dx,
-        requires_grad=requires_grad,
-        device=device
-    )
-
-    output_tensor = integration.generate_ray_tensor()
-
-    # Pad zeros to the front of the third dimension (s) of output_tensor
-    output_tensor_1 = torch.cat(
-        [torch.zeros_like(output_tensor[:, :, :1]), output_tensor], dim=2
-    )
-
-    output_tensor_2 = torch.cat(
-        [output_tensor, torch.zeros_like(output_tensor[:, :, :1])], dim=2
-    )
-
-    output_tensor = (output_tensor_1 + output_tensor_2) / 2
-
-    del output_tensor_1, output_tensor_2
-
-    output_tensor = output_tensor[:, :, 1:-1]
-
-    area = integration.generate_area_tensor()
-    area = area[:, :, :-1]
-
-    # Check memory usage of output_tensor
-    tensor_bytes = output_tensor.element_size() * output_tensor.nelement()
-    tensor_megabytes = tensor_bytes / (1024 ** 2)
-    print(f"output_tensor uses {tensor_megabytes:.2f} MB of memory")
-
-    output_tensor = output_tensor * area
-    
-    
-    del area
-
-
-    output_tensor = reduce(output_tensor, 'h w s -> h w', 'sum')
-    torch.cuda.empty_cache()
-
-    return output_tensor
-
-def integrate_field_volumetric_correction(
-    field: Callable[[torch.Tensor, Any], torch.Tensor],
-    source_hdu: Any,
-    dx: float = 1e7,
-    requires_grad: bool = False,
-    device: str = "cuda:0"
-) -> torch.Tensor:
-    """
-    Integrate a scalar field along rays, including pixel area and 1/r^2 correction.
-
-    Args:
-        field: Function that evaluates the scalar field at given coordinates.
-        source_hdu: FITS HDU containing image data and header.
-        dx: Step size along the ray in meters.
-        requires_grad: If True, enables autograd for PyTorch tensors.
-        device: Device for computation ('cuda:0' for GPU, 'cpu' for CPU).
-
-    Returns:
-        Integrated field image (2D tensor) with pixel area and 1/r^2 correction.
-    """
-
-    integration = RayIntegrator(
-        field=field,
-        source_hdu=source_hdu,
-        dx=dx,
-        requires_grad=requires_grad,
-        device=device
-    )
-
-    output_tensor = integration.generate_ray_tensor()
-    area = integration.generate_area_tensor()
-    output_tensor = output_tensor * area
-
-    correction = integration.generate_correction()
-
-    correction = rearrange(correction, "1 1 1 s -> 1 1 s ")  # Reshape to match output_tensor shape
-
-
-    output_tensor = output_tensor * correction
-
-    output_tensor = reduce(output_tensor, 'h w s -> h w', 'sum')
-
-
-
-    del area, correction
-    
-    torch.cuda.empty_cache()
-
-    return output_tensor
+def collapse_output(output: torch.Tensor) -> torch.Tensor:
+    """Collapse the output tensor along the spatial dimensions."""
+    return reduce(output, 'h w s -> h w', 'sum')

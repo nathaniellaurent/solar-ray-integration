@@ -3,6 +3,9 @@ from typing import Tuple
 import torch
 from torch import nn
 
+# Added constant for solar radius (meters)
+RSUN_METERS = 4*6.9634e8
+
 
 class NeRF(nn.Module):
     r"""
@@ -27,7 +30,7 @@ class NeRF(nn.Module):
         # encoding_config = {'type': 'positional', 'num_freqs': 20} if encoding_config is None else encoding_config
         # encoding_type = encoding_config.pop('type')
         if encoding == 'positional':
-            enc = PositionalEncoding(d_input=d_input, n_freqs=10)
+            enc = PositionalEncoding(d_input=d_input, n_freqs=13, scale_factor=1.)
             in_layer = nn.Linear(enc.d_output, d_filter)
             self.in_layer = nn.Sequential(enc, in_layer)
         else:
@@ -48,16 +51,20 @@ class NeRF(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         r"""
         Forward pass with optional view direction.
+        Now normalizes input coordinates by solar radius to keep values ~O(1).
         """
 
-        # Apply forward pass
+        # Normalize coordinates by solar radius
+        rsun = torch.as_tensor(RSUN_METERS, dtype=x.dtype, device=x.device)
+        x = x / rsun
 
-        print("Input to NeRF:", x)
-        print("Input device:", x.device)
-        print("in_layer device:", next(self.in_layer.parameters()).device)
-        for i, layer in enumerate(self.layers):
-            print(f"Layer {i} device:", next(layer.parameters()).device)
-        print("out_layer device:", next(self.out_layer.parameters()).device)
+        # Debug prints (kept)
+        # print("Input to NeRF (normalized by R_sun):", x)
+        # print("Input device:", x.device)
+        # print("in_layer device:", next(self.in_layer.parameters()).device)
+        # for i, layer in enumerate(self.layers):
+        #     print(f"Layer {i} device:", next(layer.parameters()).device)
+        # print("out_layer device:", next(self.out_layer.parameters()).device)
         x = self.act(self.in_layer(x))
         for i, layer in enumerate(self.layers):
             x = self.act(layer(x))
@@ -65,7 +72,7 @@ class NeRF(nn.Module):
             #     x = torch.cat([x, x_input], dim=-1)
         x = self.out_layer(x)
 
-        print("Output passed through NeRF:", x)
+        # print("Output passed through NeRF:", x)
 
         return x
 
