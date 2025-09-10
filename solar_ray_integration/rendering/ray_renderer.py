@@ -61,7 +61,7 @@ class RayRenderer(nn.Module):
         self.dsun = dsun
         self.rsun = rsun
         
-    def forward(self, ray_with_steps: torch.Tensor, requires_grad: bool = True) -> torch.Tensor:
+    def forward(self, rays_with_steps: torch.Tensor, requires_grad: bool = True) -> torch.Tensor:
         """
         Forward pass: render the solar field using the NeRF model.
         
@@ -76,7 +76,7 @@ class RayRenderer(nn.Module):
        
         
         # Evaluate neural field: (B, S)
-        output_tensor = self.neural_field(ray_with_steps)
+        output_tensor = self.neural_field(rays_with_steps)
         
         # Collapse along steps dimension: (B,)
         pixel_value = output_tensor.sum(dim=1)

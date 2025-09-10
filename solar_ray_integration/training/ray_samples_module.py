@@ -104,6 +104,7 @@ class RayWiseLightningModule(pl.LightningModule):
         # Metrics tracking
         self.train_losses = []
         self.val_losses = []
+        self.dx = dx
     
     def configure_callbacks(self):
         """Configure callbacks: model checkpointing, LR monitoring."""
@@ -139,6 +140,7 @@ class RayWiseLightningModule(pl.LightningModule):
         # rays_batch = rays.detach().clone().requires_grad_(True)
         rays_with_steps = batch['rays_with_steps']  # (B, S, 3)
         # Pass the whole batch to ray_renderer (assumes ray_renderer supports batch processing)
+        rays_with_steps = rays_with_steps.detach().clone().requires_grad_(True)
         rendered_pixels = self.ray_renderer(rays_with_steps=rays_with_steps, requires_grad=True)
         return rendered_pixels
     
@@ -161,11 +163,17 @@ class RayWiseLightningModule(pl.LightningModule):
             shape_out=shape_out,
             device=device
         )
+        
+
         obs = obs.expand(rays.shape[1], rays.shape[2], 3)
         # Flatten obs and rays for batch processing
         obs_flat = obs.reshape(-1, 3)
         rays_flat = rays.reshape(-1, 3)
-        rendered_pixels = self.ray_renderer(obs=obs_flat, ray=rays_flat, requires_grad=False)
+
+        rays_with_steps = self.obs_rays_to_rays_with_steps(obs=obs_flat, rays=rays_flat, wcs=wcs)  # (B, S, 3)
+
+        
+        rendered_pixels = self.ray_renderer(rays_with_steps=rays_with_steps, requires_grad=False)
         # Unflatten rendered_pixels to image shape
         rendered_image = rendered_pixels.reshape(shape_out)
         return rendered_image
@@ -243,7 +251,9 @@ class RayWiseLightningModule(pl.LightningModule):
             # Flatten obs and rays for batch processing
             obs_flat = obs.reshape(-1, 3)
             rays_flat = rays.reshape(-1, 3)
-            rendered_pixels = self.ray_renderer(obs=obs_flat, ray=rays_flat)
+            rays_with_steps = self.obs_rays_to_rays_with_steps(obs=obs_flat, rays=rays_flat, wcs=WCS(header))  # (B, S, 3)
+
+            rendered_pixels = self.ray_renderer(rays_with_steps)
 
             # Unflatten rendered_pixels to image shape
             rendered_image = rendered_pixels.reshape(sample_image.shape)
@@ -398,6 +408,38 @@ class RayWiseLightningModule(pl.LightningModule):
         except Exception as e:
             print(f"Could not compute effective batch size: {e}")
 
+    def obs_rays_to_rays_with_steps(self, obs: torch.Tensor, rays: torch.Tensor, wcs: WCS) -> torch.Tensor:
+        """
+        Convert obs and rays to rays_with_steps for ray integration.
+        
+        Args:
+            obs: Observer positions (B, 3)
+            rays: Ray directions (B, 3)
+        """
+        obs = obs.to(dtype=torch.float32, device=self.device)
+        rays = rays.to(dtype=torch.float32, device=self.device)
+
+        # Batch size
+        B = obs.shape[0]
+
+        # Create steps (S,)
+        dsun = wcs.wcs.aux.dsun_obs
+        rsun = wcs.wcs.aux.rsun_ref
+        dx = self.dx
+        steps = torch.arange((dsun - 2*rsun), (dsun + 2*rsun), dx, device=self.device, dtype=torch.float32)
+        S = steps.shape[0]
+        
+        # Reshape steps to (S, 1) and then expand for batch: (B, S, 1)
+        steps_reshaped = steps.unsqueeze(1)  # (S, 1)
+        steps_expanded = steps_reshaped.unsqueeze(0).expand(B, S, 1)  # (B, S, 1)
+        # Expand obs and ray for broadcasting: (B, 1, 3)
+        obs_expanded = obs.unsqueeze(1)  # (B, 1, 3)
+        rays_expanded = rays.unsqueeze(1)  # (B, 1, 3)
+        
+        # Compute ray positions: (B, S, 3)
+        rays_with_steps = obs_expanded + steps_expanded * rays_expanded
+
+        return rays_with_steps  # (B, S, 3)
     
 
     
