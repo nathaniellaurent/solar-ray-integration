@@ -130,15 +130,16 @@ class RayWiseLightningModule(pl.LightningModule):
             Rendered pixels as a 1D tensor (B,)
         """
         # Process entire batch at once instead of looping
-        obs = batch['obs']      # (B, 3)
-        rays = batch['rays']    # (B, 3)
+        # obs = batch['obs']      # (B, 3)
+        # rays = batch['rays']    # (B, 3)
         
-        # Process batch through ray renderer
-        # Detach and clone obs and rays to ensure fresh tensors
-        obs_batch = obs.detach().clone().requires_grad_(True)
-        rays_batch = rays.detach().clone().requires_grad_(True)
+        # # Process batch through ray renderer
+        # # Detach and clone obs and rays to ensure fresh tensors
+        # obs_batch = obs.detach().clone().requires_grad_(True)
+        # rays_batch = rays.detach().clone().requires_grad_(True)
+        rays_with_steps = batch['rays_with_steps']  # (B, S, 3)
         # Pass the whole batch to ray_renderer (assumes ray_renderer supports batch processing)
-        rendered_pixels = self.ray_renderer(obs=obs_batch, ray=rays_batch, requires_grad=True)
+        rendered_pixels = self.ray_renderer(rays_with_steps=rays_with_steps, requires_grad=True)
         return rendered_pixels
     
     def render_sample_image(self, header: Any, device: str) -> torch.Tensor:
