@@ -61,7 +61,7 @@ class RayRenderer(nn.Module):
         self.dsun = dsun
         self.rsun = rsun
         
-    def forward(self, obs: torch.Tensor , ray: torch.Tensor, requires_grad: bool = True) -> torch.Tensor:
+    def forward(self, ray_with_steps: torch.Tensor, requires_grad: bool = True) -> torch.Tensor:
         """
         Forward pass: render the solar field using the NeRF model.
         
@@ -73,29 +73,7 @@ class RayRenderer(nn.Module):
         Returns:
             Rendered rays as a 1D tensor of shape (B,).
         """
-        # Ensure inputs are float32 and on the correct device
-        obs = obs.to(dtype=torch.float32, device=self.device)
-        ray = ray.to(dtype=torch.float32, device=self.device)
-        
-        # Batch size
-        B = obs.shape[0]
-        
-        # Create steps (S,)
-        dsun = self.dsun
-        rsun = self.rsun
-        dx = self.dx
-        steps = torch.arange((dsun - 2*rsun), (dsun + 2*rsun), dx, device=self.device, dtype=torch.float32)
-        S = steps.shape[0]
-        
-        # Reshape steps to (S, 1) and then expand for batch: (B, S, 1)
-        steps_reshaped = steps.unsqueeze(1)  # (S, 1)
-        steps_expanded = steps_reshaped.unsqueeze(0).expand(B, S, 1)  # (B, S, 1)
-        # Expand obs and ray for broadcasting: (B, 1, 3)
-        obs_expanded = obs.unsqueeze(1)  # (B, 1, 3)
-        ray_expanded = ray.unsqueeze(1)  # (B, 1, 3)
-        
-        # Compute ray positions: (B, S, 3)
-        ray_with_steps = obs_expanded + steps_expanded * ray_expanded
+       
         
         # Evaluate neural field: (B, S)
         output_tensor = self.neural_field(ray_with_steps)
