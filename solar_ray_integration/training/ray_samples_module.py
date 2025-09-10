@@ -182,13 +182,13 @@ class RayWiseLightningModule(pl.LightningModule):
         # Compute loss
         loss = self.loss_fn(predicted, target)
 
-        print(f"Predicted shape: {predicted.shape}, Target shape: {target.shape}")
+        # print(f"Predicted shape: {predicted.shape}, Target shape: {target.shape}")
 
         # Logging
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
         self.log('lr', self.optimizers().param_groups[0]['lr'], on_step=True)
 
-        print(f"Predicted shape: {predicted.shape}, Target shape: {target.shape}")
+        # print(f"Predicted shape: {predicted.shape}, Target shape: {target.shape}")
         
         
         # Store for epoch-level statistics
@@ -214,11 +214,11 @@ class RayWiseLightningModule(pl.LightningModule):
         mae = F.l1_loss(predicted, target)
         mse = F.mse_loss(predicted, target)
 
-        print(f"Predicted shape: {predicted.shape}, Target shape: {target.shape}")
+        # print(f"Predicted shape: {predicted.shape}, Target shape: {target.shape}")
 
 
 
-        print(f"Predicted shape: {predicted.shape}, Target shape: {target.shape}")
+        # print(f"Predicted shape: {predicted.shape}, Target shape: {target.shape}")
 
         
         # Logging

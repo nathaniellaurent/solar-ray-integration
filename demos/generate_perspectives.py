@@ -18,12 +18,7 @@ import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from solar_ray_integration.ray_integration.integrate_field import (
-    calculate_field_linear,
-    calculate_field_volumetric,
-    calculate_field_volumetric_correction,
-    calculate_field_volumetric_trapezoidal
-)
+from solar_ray_integration.ray_integration.integrate_field import RayIntegrator, collapse_output
 
 
 
@@ -123,11 +118,14 @@ if __name__ == "__main__":
     # print(client.dashboard_link)
 
 
-    output_dir = "perspective_data/perspective_data_linear_fits_small"
+    output_dir = "perspective_data/perspective_data_linear_fits_64x64_ecliptic"
     os.makedirs(output_dir, exist_ok=True)
 
-    hgln_values = np.linspace(-180, 180, 10)
-    hglt_values = np.linspace(-90, 90, 10)
+    # hgln_values = np.linspace(-180, 180, 10)
+    # hglt_values = np.linspace(-90, 90, 10)
+
+    hgln_values = np.linspace(-180, 180, 100)
+    hglt_values = np.linspace(0, 0, 1)
 
 
 
@@ -147,9 +145,9 @@ if __name__ == "__main__":
         
         # print(f"Loaded source data for idx {idx} with shape {source_data.shape}")        
 
-        # Use sunpy to resample the image to 128 x 128
+        # Use sunpy to resample the image to 64 x 64
         source_map = sunpy.map.Map(source_data, source_hdu.header)
-        resampled_map = source_map.resample((128, 128) * u.pixel)
+        resampled_map = source_map.resample((64, 64) * u.pixel)
         source_data = resampled_map.data
         source_wcs = resampled_map.wcs
         source_wcs.wcs.aux.hglt_obs = float(hglt)
@@ -157,13 +155,18 @@ if __name__ == "__main__":
 
         temp_hdu = PrimaryHDU(source_data, header=source_wcs.to_header())
 
-        output_tensor = calculate_field_linear(
-            sun_sphere_scalar,
-            temp_hdu,
-            dx=1e7,
-            requires_grad=False,
-            device='cpu'
+        integrator = RayIntegrator(
+            field = sun_sphere_scalar,
+            source_hdu = temp_hdu,
+            dx = 1e7,
+            requires_grad = False,
+            device = "cuda:0"
         )
+
+
+
+        output_tensor = integrator.calculate_field_linear()
+        output_tensor = collapse_output(output_tensor)
         
         output_hdu = PrimaryHDU(output_tensor.cpu().detach().numpy(), header=source_wcs.to_header())
         output_hdu.header['HGLN_OBS'] = float(hgln)

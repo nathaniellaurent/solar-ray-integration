@@ -91,8 +91,8 @@ def train_model(
     nerf_config = {
         'd_input': 3,
         'd_output': 1,
-        'n_layers': 4,  # Reduced from 8 to 4
-        'd_filter': 64,  # Reduced from 512 to 256
+        'n_layers': 8,  # Reduced from 8 to 4
+        'd_filter': 256,  # Reduced from 512 to 256
         'encoding': 'positional' #'positional'
     }
     

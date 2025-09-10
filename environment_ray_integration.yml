@@ -21,7 +21,8 @@ dependencies:
   - einops
   - pip:
     - torch 
+    - tensorboard
     - torchvision
     - torchaudio
     - pytorch-lightning
-    - -e /home/nlaurent/dfreproject
+    - -e /d0/nlaurent/dfreproject

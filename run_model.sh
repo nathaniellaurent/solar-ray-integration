@@ -1,0 +1,2 @@
+export CUDA_VISIBLE_DEVICES=3 
+nohup python -m solar_ray_integration.training train --max-epochs 100 --batch-size 100 --gpus 1 --num-workers 0 --data-dir perspective_data/perspective_data_linear_fits_64x64_ecliptic --learning-rate 1e-4 --weight-decay 0 --single-ray --experiment-name batch_100_lr_1e-4_ecliptic_8x256 &
