@@ -48,6 +48,7 @@ from laplace.baselaplace import FullLaplace
 from laplace.curvature.backpack import BackPackGGN
 
 from laplace import Laplace, marglik_training
+from tqdm import tqdm
 
 # Ensure package import
 sys.path.append(os.path.dirname(__file__))
@@ -173,11 +174,30 @@ def render_from_checkpoint(
 
     
 
-    la = Laplace(model, 'regression', subset_of_weights='all', hessian_structure='full', dict_key_x="rays_with_steps",
+    # Speed optimization options - try these in order of preference:
+    
+    # Option 1: Use diagonal Hessian approximation (much faster)
+    la = Laplace(model, 'regression', subset_of_weights='last_layer', hessian_structure='full', dict_key_x="rays_with_steps",
         dict_key_y="pixels")
+    
+    # Option 2: If you need more weights, use Kronecker-factored approximation
+    # la = Laplace(model, 'regression', subset_of_weights='last_layer', hessian_structure='kron', dict_key_x="rays_with_steps",
+    #     dict_key_y="pixels")
+    
+    # Option 3: Original full computation (slowest)
+    # la = Laplace(model, 'regression', subset_of_weights='all', hessian_structure='full', dict_key_x="rays_with_steps",
+    #     dict_key_y="pixels")
+    
     train_loader = data_module.train_dataloader()
     
-    la.fit(train_loader)
+    # Option A: Use full dataset (slower but more accurate)
+    la.fit(train_loader, progress_bar=True)
+    
+    # Option B: Use subset of data for much faster computation
+    # Uncomment this to use only first N batches for Hessian computation
+    # from itertools import islice
+    # subset_loader = islice(train_loader, 10)  # Use only first 10 batches
+    # la.fit(subset_loader, progress_bar=True)
 
     n_epochs = 1
 
@@ -188,6 +208,15 @@ def render_from_checkpoint(
         neg_marglik = - la.log_marginal_likelihood(log_prior.exp(), log_sigma.exp())
         neg_marglik.backward()
         hyper_optimizer.step()
+
+    # Get a batch of data from train_loader
+    batch = next(iter(train_loader))
+    
+
+    f_mu, f_var = la(batch)
+
+    print(f"f_mu shape: {f_mu.shape}")
+    print(f"f_var shape: {f_var.shape}")
 
     
     dataset = SolarPerspectiveDataset(
