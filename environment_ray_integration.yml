@@ -26,4 +26,4 @@ dependencies:
     - pytorch-lightning
     - laplace-torch
     - tensorboard
-    - -e /home/nlaurent/dfreproject
+    - -e /d0/nlaurent/dfreproject

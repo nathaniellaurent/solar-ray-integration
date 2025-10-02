@@ -49,6 +49,7 @@ class RayWiseLightningModule(pl.LightningModule):
         save_top_k: int = 3,
         image_save_dir: str = "outputs/images",
         accumulate_grad_batches: int = 1,
+        save_every_epoch: bool = False,
         **kwargs
     ):
         """
@@ -108,17 +109,40 @@ class RayWiseLightningModule(pl.LightningModule):
     
     def configure_callbacks(self):
         """Configure callbacks: model checkpointing, LR monitoring."""
-        ckpt_cb = ModelCheckpoint(
-            dirpath=self.hparams.checkpoint_dir,
-            filename="solar-nerf-{epoch:02d}-{val_loss:.4f}",
-            monitor=self.hparams.checkpoint_monitor,
-            mode="min" if "loss" in self.hparams.checkpoint_monitor else "max",
-            save_top_k=self.hparams.save_top_k,
-            save_last=True,
-            auto_insert_metric_name=False
-        )
+        callbacks = []
+        
+        # Configure checkpoint callback based on save_every_epoch setting
+        if self.hparams.save_every_epoch:
+            # Save checkpoint at every epoch
+            ckpt_cb = ModelCheckpoint(
+                dirpath=self.hparams.checkpoint_dir,
+                filename="solar-nerf-{epoch:02d}-{val_loss:.4f}",
+                monitor=self.hparams.checkpoint_monitor,
+                mode="min" if "loss" in self.hparams.checkpoint_monitor else "max",
+                save_top_k=-1,  # Save all checkpoints
+                every_n_epochs=1,  # Save every epoch
+                save_last=True,
+                auto_insert_metric_name=False
+            )
+        else:
+            # Standard checkpoint callback (save only top-k best)
+            ckpt_cb = ModelCheckpoint(
+                dirpath=self.hparams.checkpoint_dir,
+                filename="solar-nerf-{epoch:02d}-{val_loss:.4f}",
+                monitor=self.hparams.checkpoint_monitor,
+                mode="min" if "loss" in self.hparams.checkpoint_monitor else "max",
+                save_top_k=self.hparams.save_top_k,
+                save_last=True,
+                auto_insert_metric_name=False
+            )
+        
+        callbacks.append(ckpt_cb)
+        
+        # Learning rate monitor
         lr_monitor = LearningRateMonitor(logging_interval='step')
-        return [ckpt_cb, lr_monitor]
+        callbacks.append(lr_monitor)
+        
+        return callbacks
     
     def forward(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
         """
@@ -140,7 +164,7 @@ class RayWiseLightningModule(pl.LightningModule):
         # rays_batch = rays.detach().clone().requires_grad_(True)
         rays_with_steps = batch['rays_with_steps']  # (B, S, 3)
         # Pass the whole batch to ray_renderer (assumes ray_renderer supports batch processing)
-        rays_with_steps = rays_with_steps.detach().clone().requires_grad_(True)
+        # rays_with_steps = rays_with_steps.detach().clone().requires_grad_(True)
         rendered_pixels = self.ray_renderer(rays_with_steps=rays_with_steps, requires_grad=True)
         return rendered_pixels
     

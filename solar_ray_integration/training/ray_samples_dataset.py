@@ -137,9 +137,9 @@ class SolarRayPixelDataset(Dataset):
         
         
         # Get the ray, obs, and pixel directly from flattened arrays
-        ray_val = self.rays_all[index].clone()  # (3,)
-        obs_val = self.obs_all[index].clone()   # (3,)
-        pixel_val = self.pixels[index].clone()  # scalar
+        ray_val = self.rays_all[index].detach().clone().requires_grad_(True)  # (3,)
+        obs_val = self.obs_all[index].detach().clone().requires_grad_(True)  # (3,)
+        pixel_val = self.pixels[index].detach().clone().requires_grad_(True)
 
 
         sample = {

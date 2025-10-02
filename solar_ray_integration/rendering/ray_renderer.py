@@ -102,29 +102,26 @@ class RayRenderer(nn.Module):
         
         Args:
             coords: Tensor of shape (..., 3) representing (x, y, z) coordinates.
+                   Can handle (B, S, 3) directly now.
             **kwargs: Additional arguments (unused, for compatibility).
             
         Returns:
-            Field values at the given coordinates.
+            Field values at the given coordinates with same shape as input except last dim.
         """
-        # Reshape coordinates for NeRF input
-        original_shape = coords.shape[:-1]
-        coords_flat = coords.reshape(-1, 3)
+        # NeRF can now handle (B, S, 3) input directly
+
+        # Flatten coords to 2D (N, 3) before passing to NeRF
+        # original_shape = coords.shape
+        # coords_flat = coords.view(-1, 3)
+        # field_values_flat = self.nerf(coords_flat)
+        # # Unflatten to original shape except last dim
+        # field_values = field_values_flat.view(*original_shape[:-1], field_values_flat.shape[-1])
+
+        field_values = self.nerf(coords)
         
-        # Normalize coordinates (optional - you may want to adjust this based on your data)
-        # coords_normalized = coords_flat / 7e8  # Normalize by solar radius
-        
-        # Evaluate NeRF
-        field_values = self.nerf(coords_flat)
-        
-        # Reshape back to original spatial dimensions
-        field_values = field_values.reshape(*original_shape, -1)
-        
-        # If NeRF outputs multiple channels, you might want to select one or combine them
-        # if field_values.shape[-1] > 1:
-        #     field_values = field_values[..., 0]  # Take first channel
-        # else:
-        field_values = field_values.squeeze(-1)
+        # Squeeze last dimension if it's 1 (typical for scalar fields)
+        if field_values.shape[-1] == 1:
+            field_values = field_values.squeeze(-1)
         
         # Apply activation to ensure positive values (optional)
         # field_values = torch.relu(field_values)

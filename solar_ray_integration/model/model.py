@@ -143,10 +143,34 @@ class PositionalEncoding(nn.Module):
     def forward(self, x) -> torch.Tensor:
         r"""
         Apply positional encoding to input.
+        
+        Args:
+            x: Input coordinates of shape (..., d_input)
+               Can handle (B, 3), (B, S, 3), or any shape ending in d_input
+        
+        Returns:
+            Encoded coordinates of shape (..., d_output)
         """
-        f = self.freq_bands[None, :, None]
-        enc = [x,
-               (torch.sin(x[:, None, :] * f / self.scale_factor)).reshape(x.shape[0], -1),
-               (torch.cos(x[:, None, :] * f / self.scale_factor)).reshape(x.shape[0], -1)
-               ]
-        return torch.concat(enc, dim=-1)
+        # Get batch dimensions (all except last)
+        batch_shape = x.shape[:-1]
+        
+        # Reshape for encoding: (..., d_input) -> (N, d_input)
+        x_flat = x.reshape(-1, self.d_input)
+        
+        # Apply positional encoding
+        f = self.freq_bands[None, :, None]  # (1, n_freqs, 1)
+        
+        # Compute sin and cos encodings
+        sin_enc = torch.sin(x_flat[:, None, :] * f / self.scale_factor)  # (N, n_freqs, d_input)
+        cos_enc = torch.cos(x_flat[:, None, :] * f / self.scale_factor)  # (N, n_freqs, d_input)
+        
+        # Flatten frequency and input dimensions
+        sin_enc = sin_enc.reshape(x_flat.shape[0], -1)  # (N, n_freqs * d_input)
+        cos_enc = cos_enc.reshape(x_flat.shape[0], -1)  # (N, n_freqs * d_input)
+        
+        # Concatenate original coords with sin/cos encodings
+        enc = torch.cat([x_flat, sin_enc, cos_enc], dim=-1)  # (N, d_output)
+        
+        # Reshape back to original batch dimensions
+        output_shape = batch_shape + (self.d_output,)
+        return enc.reshape(output_shape)
