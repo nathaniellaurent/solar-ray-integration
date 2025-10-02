@@ -24,4 +24,6 @@ dependencies:
     - torchvision
     - torchaudio
     - pytorch-lightning
-    - -e /home/nlaurent/dfreproject
+    - laplace-torch
+    - tensorboard
+    - -e /d0/nlaurent/dfreproject

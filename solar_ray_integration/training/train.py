@@ -21,7 +21,7 @@ def train_model(
     batch_size: int = 4,
     max_epochs: int = 100,
     learning_rate: float = 5e-4,
-    weight_decay: float = 1e-6,
+    weight_decay: float = 0,
     integration_method: str = "linear",
     num_workers: int = 4,
     gpus: int = 1,
@@ -31,6 +31,8 @@ def train_model(
     accumulate_grad_batches: int = 1,
     compare_ground_truth: bool = False,
     single_ray: bool = False,
+    save_every_epoch: bool = False,
+    checkpoint_dir: str = None,
     **kwargs
 ):
     """
@@ -51,6 +53,7 @@ def train_model(
         seed: Random seed
         resume_from_checkpoint: Path to checkpoint to resume from
         accumulate_grad_batches: Number of batches to accumulate before optimizer step
+        checkpoint_dir: Directory to save model checkpoints (overrides default)
     """
     # Set seed for reproducibility
     pl.seed_everything(seed)
@@ -60,6 +63,10 @@ def train_model(
     # Create output directory
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
+    
+    # Set checkpoint directory (use default if not provided)
+    if checkpoint_dir is None:
+        checkpoint_dir = str(output_path / "checkpoints" / experiment_name)
     
     # Ensure log directory exists
     log_root = output_path / "logs"
@@ -120,6 +127,8 @@ def train_model(
             loss_type="mse",
             device=device,
             accumulate_grad_batches=accumulate_grad_batches,
+            save_every_epoch=save_every_epoch,
+            checkpoint_dir=checkpoint_dir
         )
     
     # Callbacks
@@ -221,7 +230,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=4, help="Batch size")
     parser.add_argument("--max-epochs", type=int, default=100, help="Max epochs")
     parser.add_argument("--learning-rate", type=float, default=5e-4, help="Learning rate")
-    parser.add_argument("--weight-decay", type=float, default=1e-6, help="Weight decay")
+    parser.add_argument("--weight-decay", type=float, default=0, help="Weight decay")
     parser.add_argument("--integration-method", type=str, default="linear",
                        choices=["linear", "volumetric", "volumetric_correction"],
                        help="Ray integration method")
@@ -246,6 +255,10 @@ def main():
                        help="Compare predictions to ground truth instead of collapsed output")
     parser.add_argument("--single-ray", action='store_true',
                        help="Use ray-wise training (single ray per pixel)")
+    parser.add_argument("--save-every-epoch", action='store_true',
+                       help="Save checkpoint at the end of every epoch")
+    parser.add_argument("--checkpoint-dir", type=str, default=None,
+                       help="Directory to save model checkpoints (overrides default)")
     
     args = parser.parse_args()
     
@@ -266,7 +279,9 @@ def main():
         resume_from_checkpoint=args.resume_from_checkpoint,
         accumulate_grad_batches=args.accumulate_grad_batches,
         compare_ground_truth=args.compare_ground_truth,
-        single_ray=args.single_ray
+        single_ray=args.single_ray,
+        save_every_epoch=args.save_every_epoch,
+        checkpoint_dir=args.checkpoint_dir
     )
 
 
